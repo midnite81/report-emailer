@@ -1,0 +1,18 @@
+{
+    "name": "midnite81/report-emailer",
+    "description": "A package make report emailing easier in laravel",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Simon Rogers",
+            "email": "webdev@centralblue.co.uk"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Midnite81\\ReportEmailer\\": "src/"
+        }
+    },
+    "require": {}
+}
