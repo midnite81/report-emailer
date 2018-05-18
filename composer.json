@@ -15,7 +15,7 @@
         }
     },
     "require": {
-        "maatwebsite/excel": "^2.1",
+        "maatwebsite/excel": "^2.0",
         "midnite81/laravel-base": "^2.3"
     }
 }
