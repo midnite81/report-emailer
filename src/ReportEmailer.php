@@ -45,6 +45,16 @@ abstract class ReportEmailer
     protected $maxSheets = 10;
 
     /**
+     * Rules to rename the sheets
+     *
+     * @return array
+     */
+    public function rename()
+    {
+        return [];
+    }
+
+    /**
      * Data you want to be passed through to page one of the excel spreadsheet
      * (you can sequentially create sheet2, sheet3
      *
@@ -58,6 +68,13 @@ abstract class ReportEmailer
      * @return string
      */
     abstract public function body();
+
+    /**
+     * Whether the body of the email is HTML or not
+     *
+     * @return bool
+     */
+    abstract public function isHtml();
 
     /**
      * The subject of the email
@@ -176,8 +193,11 @@ abstract class ReportEmailer
 
         $mailer->send([], [], function(Message $message) use ($createdFile) {
             $message->subject($this->subject());
-            $message->setBody($this->body());
-            // if html then 'text/html' needs to be set.
+            if ($this->isHtml()) {
+                $message->setBody($this->body(), 'text/html');
+            } else {
+                $message->setBody($this->body());
+            }
             $message->from($this->from());
             $message->to($this->to());
             if (! empty($this->cc())) {
@@ -242,7 +262,9 @@ abstract class ReportEmailer
          */
         $savedFile = $excel->create($temporaryFileName, function (LaravelExcelWriter $excel) {
             foreach ($this->sheetData as $key => $sheetDatum) {
-                $excel->sheet('Sheet ' . ($key + 1), function (LaravelExcelWorksheet $sheet) use ($sheetDatum) {
+                $sheetName = (array_key_exists($this->sheets[$key], $this->rename())) ? $this->rename()[$this->sheets[$key]] : 'Sheet ' . ($key+1);
+
+                $excel->sheet($sheetName, function (LaravelExcelWorksheet $sheet) use ($sheetDatum) {
                     if ($sheetDatum instanceof \Illuminate\Database\Eloquent\Model) {
                         $sheet->fromModel($sheetDatum);
                     } else {
