@@ -234,6 +234,9 @@ abstract class ReportEmailer
             new LaravelExcelWriter(new \Illuminate\Support\Facades\Response(), new Filesystem(), new FormatIdentifier(new Filesystem())));
     }
 
+    /**
+     * Add sheets to the array of sheets
+     */
     protected function addSheetsToArray()
     {
         for ($i = 1; $i <= $this->maxSheets; $i++) {
@@ -245,6 +248,9 @@ abstract class ReportEmailer
         }
     }
 
+    /**
+     * Add Data to Array
+     */
     protected function addDataToArray()
     {
         foreach ($this->sheets as $sheet) {
