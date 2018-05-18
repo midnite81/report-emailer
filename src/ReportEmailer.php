@@ -11,6 +11,8 @@ use Illuminate\Http\Response;
 use Illuminate\Mail\Mailer;
 use Illuminate\Mail\Message;
 use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Classes\FormatIdentifier;
 use Maatwebsite\Excel\Classes\LaravelExcelWorksheet;
@@ -246,7 +248,16 @@ abstract class ReportEmailer
     protected function addDataToArray()
     {
         foreach ($this->sheets as $sheet) {
-            $this->sheetData[] = $this->{$sheet}();
+
+            $response = $this->{$sheet}();
+
+            if (( ($response instanceof Model || $response instanceof Collection || $response instanceof EloquentCollection) && $response->isEmpty()) ||
+                is_array($response) && empty($response)
+                ) {
+                $response = ['There are no records'];
+            }
+
+            $this->sheetData[] = $response;
         }
     }
 
@@ -265,7 +276,7 @@ abstract class ReportEmailer
                 $sheetName = (array_key_exists($this->sheets[$key], $this->rename())) ? $this->rename()[$this->sheets[$key]] : 'Sheet ' . ($key+1);
 
                 $excel->sheet($sheetName, function (LaravelExcelWorksheet $sheet) use ($sheetDatum) {
-                    if ($sheetDatum instanceof \Illuminate\Database\Eloquent\Model) {
+                    if ($sheetDatum instanceof Model || $sheetDatum instanceof Collection || $sheetDatum instanceof EloquentCollection) {
                         $sheet->fromModel($sheetDatum);
                     } else {
                         $sheet->fromArray($sheetDatum);
