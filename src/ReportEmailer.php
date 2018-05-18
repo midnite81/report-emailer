@@ -1,17 +1,24 @@
 <?php
 namespace Midnite81\ReportEmailer;
 
+use App\User;
 use Illuminate\Bus\Dispatcher;
 use Illuminate\Container\Container;
+use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Response;
+use Illuminate\Mail\Mailer;
+use Illuminate\Mail\Message;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Classes\FormatIdentifier;
 use Maatwebsite\Excel\Classes\LaravelExcelWorksheet;
 use Maatwebsite\Excel\Classes\PHPExcel;
 use Maatwebsite\Excel\Excel;
 use Maatwebsite\Excel\Readers\LaravelExcelReader;
 use Maatwebsite\Excel\Writers\LaravelExcelWriter;
+use Midnite81\ReportEmailer\Helpers\Mime;
 use Monolog\Handler\FleepHookHandler;
 
 abstract class ReportEmailer
@@ -51,6 +58,20 @@ abstract class ReportEmailer
      * @return string
      */
     abstract public function body();
+
+    /**
+     * The subject of the email
+     *
+     * @return string
+     */
+    abstract public function subject();
+
+    /**
+     * The filename of the Report (excluding extension)
+     *
+     * @return string
+     */
+    abstract public function fileName();
 
     /**
      * Email address(es) of the sender
@@ -99,7 +120,7 @@ abstract class ReportEmailer
      */
     public function run()
     {
-        $temporaryFileName = 'ascascion';
+        $temporaryFileName = uuid();
 
         $excel = new Excel(new PHPExcel(),
                             new LaravelExcelReader(new Filesystem(), new FormatIdentifier(new Filesystem()), new Dispatcher(new Container())),
@@ -117,6 +138,9 @@ abstract class ReportEmailer
             $this->sheetData[] = $this->{$sheet}();
         }
 
+        /**
+         * @var LaravelExcelWriter $savedFile
+         */
         $savedFile = $excel->create($temporaryFileName, function(LaravelExcelWriter $excel) {
             foreach($this->sheetData as $key=>$sheetDatum) {
                 $excel->sheet('Sheet ' . ($key+1), function(LaravelExcelWorksheet $sheet) use ($sheetDatum) {
@@ -129,14 +153,76 @@ abstract class ReportEmailer
             }
 
 
-        })->export($this->extension());
+        })->store($this->extension(), $this->saveTo());
 
+        $createdFile = $savedFile->storagePath . DIRECTORY_SEPARATOR . $savedFile->getFileName() . '.' . $savedFile->ext;
 
-//        $this->mail($savedFile);
+        $this->mail($createdFile);
 
+        $this->destroyTemporaryFile($createdFile);
     }
 
-    protected function mail($savedFile)
+    /**
+     * Return results of a SQL query
+     *
+     * @param $sql
+     * @return mixed
+     */
+    protected function sqlQuery($sql)
     {
+        /** @var Connection $db */
+        $db = app(Connection::class);
+
+        $results = $db->select($sql);
+        $output = [];
+
+        $count = 0;
+        if (! empty($results)) {
+            foreach($results as $key=>$value) {
+               foreach($value as $childKey=>$childValue) {
+                   $output[$count][$childKey] = $childValue;
+               }
+                $count++;
+            }
+        }
+
+        return collect($output);
+    }
+
+    /**
+     * Emails the report to the user
+     *
+     * @param $savedFile
+     */
+    protected function mail($createdFile)
+    {
+        /** @var Mailer $mailer */
+        $mailer = app(Mailer::class);
+
+        $mailer->send([], [], function(Message $message) use ($createdFile) {
+            $message->subject($this->subject());
+            $message->setBody($this->body());
+            // if html then 'text/html' needs to be set.
+            $message->from($this->from());
+            $message->to($this->to());
+            if (! empty($this->cc())) {
+                $message->cc($this->cc());
+            }
+            if (! empty($this->bcc())) {
+                $message->bcc($this->bcc());
+            }
+            $message->attach($createdFile , [
+                'as' => $this->fileName() . '.' . $this->extension(),
+                'mime' => Mime::getMimeType($this->extension())
+            ]);
+        });
+    }
+
+    /**
+     * Deletes the temporary file
+     */
+    protected function destroyTemporaryFile($createdFile)
+    {
+        unlink($createdFile);
     }
 }
