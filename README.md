@@ -15,7 +15,7 @@ Run `composer install` or `composer update` to download the dependencies or you 
 
 ## Register the service provider 
 
-To use the package with Laravel 5 firstly add the GeoLocation service provider to the list of service providers 
+To use the package with Laravel 5 firstly add the Report Emailer service provider to the list of service providers 
 in `app/config/app.php`.
 
     'providers' => [
