@@ -7,6 +7,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Classes\FormatIdentifier;
+use Maatwebsite\Excel\Classes\LaravelExcelWorksheet;
 use Maatwebsite\Excel\Classes\PHPExcel;
 use Maatwebsite\Excel\Excel;
 use Maatwebsite\Excel\Readers\LaravelExcelReader;
@@ -113,13 +114,12 @@ abstract class ReportEmailer
         }
 
         foreach($this->sheets as $sheet) {
-            $this->sheetData[] = $this->{$sheet};
+            $this->sheetData[] = $this->{$sheet}();
         }
 
-        $savedFile = $excel->create($temporaryFileName, function($excel) {
-
+        $savedFile = $excel->create($temporaryFileName, function(LaravelExcelWriter $excel) {
             foreach($this->sheetData as $key=>$sheetDatum) {
-                $excel->sheet('Sheet ' . ($key+1), function(LaravelExcelWriter $sheet) use ($sheetDatum) {
+                $excel->sheet('Sheet ' . ($key+1), function(LaravelExcelWorksheet $sheet) use ($sheetDatum) {
                     if ($sheetDatum instanceof \Illuminate\Database\Eloquent\Model) {
                         $sheet->fromModel($sheetDatum);
                     } else {
