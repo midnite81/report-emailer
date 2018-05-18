@@ -122,38 +122,13 @@ abstract class ReportEmailer
     {
         $temporaryFileName = uuid();
 
-        $excel = new Excel(new PHPExcel(),
-                            new LaravelExcelReader(new Filesystem(), new FormatIdentifier(new Filesystem()), new Dispatcher(new Container())),
-                            new LaravelExcelWriter(new \Illuminate\Support\Facades\Response(), new Filesystem(), new FormatIdentifier(new Filesystem())));
+        $excel = $this->newExcel();
 
-        for($i = 1; $i <= $this->maxSheets; $i++) {
-            if (method_exists($this, 'sheet' . $i)) {
-                $this->sheets[] = 'sheet' . $i;
-            } else {
-                break;
-            }
-        }
+        $this->addSheetsToArray();
 
-        foreach($this->sheets as $sheet) {
-            $this->sheetData[] = $this->{$sheet}();
-        }
+        $this->addDataToArray();
 
-        /**
-         * @var LaravelExcelWriter $savedFile
-         */
-        $savedFile = $excel->create($temporaryFileName, function(LaravelExcelWriter $excel) {
-            foreach($this->sheetData as $key=>$sheetDatum) {
-                $excel->sheet('Sheet ' . ($key+1), function(LaravelExcelWorksheet $sheet) use ($sheetDatum) {
-                    if ($sheetDatum instanceof \Illuminate\Database\Eloquent\Model) {
-                        $sheet->fromModel($sheetDatum);
-                    } else {
-                        $sheet->fromArray($sheetDatum);
-                    }
-                });
-            }
-
-
-        })->store($this->extension(), $this->saveTo());
+        $savedFile = $this->createExcelFile($excel, $temporaryFileName);
 
         $createdFile = $savedFile->storagePath . DIRECTORY_SEPARATOR . $savedFile->getFileName() . '.' . $savedFile->ext;
 
@@ -224,5 +199,60 @@ abstract class ReportEmailer
     protected function destroyTemporaryFile($createdFile)
     {
         unlink($createdFile);
+    }
+
+    /**
+     * Return instance of Excel
+     *
+     * @return Excel
+     */
+    protected function newExcel() {
+        return new Excel(new PHPExcel(),
+            new LaravelExcelReader(new Filesystem(), new FormatIdentifier(new Filesystem()), new Dispatcher(new Container())),
+            new LaravelExcelWriter(new \Illuminate\Support\Facades\Response(), new Filesystem(), new FormatIdentifier(new Filesystem())));
+    }
+
+    protected function addSheetsToArray()
+    {
+        for ($i = 1; $i <= $this->maxSheets; $i++) {
+            if (method_exists($this, 'sheet' . $i)) {
+                $this->sheets[] = 'sheet' . $i;
+            } else {
+                break;
+            }
+        }
+    }
+
+    protected function addDataToArray()
+    {
+        foreach ($this->sheets as $sheet) {
+            $this->sheetData[] = $this->{$sheet}();
+        }
+    }
+
+    /**
+     * @param $excel
+     * @param $temporaryFileName
+     * @return LaravelExcelWriter
+     */
+    protected function createExcelFile($excel, $temporaryFileName)
+    {
+        /**
+         * @var LaravelExcelWriter $savedFile
+         */
+        $savedFile = $excel->create($temporaryFileName, function (LaravelExcelWriter $excel) {
+            foreach ($this->sheetData as $key => $sheetDatum) {
+                $excel->sheet('Sheet ' . ($key + 1), function (LaravelExcelWorksheet $sheet) use ($sheetDatum) {
+                    if ($sheetDatum instanceof \Illuminate\Database\Eloquent\Model) {
+                        $sheet->fromModel($sheetDatum);
+                    } else {
+                        $sheet->fromArray($sheetDatum);
+                    }
+                });
+            }
+
+
+        })->store($this->extension(), $this->saveTo());
+        return $savedFile;
     }
 }
